@@ -91,6 +91,7 @@ export async function getNewsSentiment(ticker: string): Promise<{
     interface AVFeedItem {
       title: string; source: string; url: string; time_published: string;
       overall_sentiment_score?: string;
+      overall_sentiment_label?: string;
       ticker_sentiment?: Array<{ ticker: string; ticker_sentiment_score?: string; relevance_score?: string }>;
     }
     const feed: AVFeedItem[] = data.feed || [];
