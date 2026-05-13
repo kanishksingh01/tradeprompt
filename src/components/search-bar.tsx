@@ -15,8 +15,11 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Derived: suppress results when query is cleared (avoids setState-in-effect)
+  const showResults = open && query.length >= 1;
+
   useEffect(() => {
-    if (query.length < 1) { setResults([]); setOpen(false); return; }
+    if (query.length < 1) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
@@ -67,7 +70,7 @@ export function SearchBar({ autoFocus = false }: { autoFocus?: boolean }) {
         />
       </div>
 
-      {open && results.length > 0 ? (
+      {showResults && results.length > 0 ? (
         <div className="absolute top-full mt-1 w-full bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden">
           {results.map((r) => (
             <button

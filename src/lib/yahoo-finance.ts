@@ -50,7 +50,7 @@ async function getCrumb(): Promise<{ crumb: string; cookie: string } | null> {
   }
 }
 
-async function yfFetch(url: string, auth: { crumb: string; cookie: string }): Promise<any> {
+async function yfFetch(url: string, auth: { crumb: string; cookie: string }): Promise<unknown> {
   const sep = url.includes('?') ? '&' : '?';
   const res = await fetch(`${url}${sep}crumb=${encodeURIComponent(auth.crumb)}`, {
     headers: { 'User-Agent': UA, Cookie: auth.cookie, Accept: 'application/json' },
@@ -60,7 +60,30 @@ async function yfFetch(url: string, auth: { crumb: string; cookie: string }): Pr
   return res.json();
 }
 
-function parseContracts(raw: any[], type: 'call' | 'put'): YFContract[] {
+interface YFOptionsPayload {
+  optionChain?: {
+    result?: Array<{
+      options?: Array<{ calls?: YFRawContract[]; puts?: YFRawContract[] }>;
+      quote?: { regularMarketPrice?: number };
+      expirationDates?: number[];
+    }>;
+  };
+}
+
+interface YFRawContract {
+  contractSymbol?: string;
+  strike?: number;
+  expiration?: number;
+  lastPrice?: number;
+  bid?: number;
+  ask?: number;
+  volume?: number;
+  openInterest?: number;
+  impliedVolatility?: number;
+  inTheMoney?: boolean;
+}
+
+function parseContracts(raw: YFRawContract[], type: 'call' | 'put'): YFContract[] {
   return raw.map((c) => ({
     contractSymbol: c.contractSymbol ?? '',
     strike: c.strike ?? 0,
@@ -83,7 +106,7 @@ async function fetchExpiry(
 ): Promise<YFContract[]> {
   const base = `https://query2.finance.yahoo.com/v7/finance/options/${ticker}`;
   const url = date ? `${base}?date=${date}` : base;
-  const json = await yfFetch(url, auth);
+  const json = await yfFetch(url, auth) as YFOptionsPayload;
   const opts = json?.optionChain?.result?.[0]?.options?.[0];
   if (!opts) return [];
   return [
@@ -104,7 +127,7 @@ export async function getOptionsChain(ticker: string): Promise<{
   if (!auth) return empty;
 
   const base = `https://query2.finance.yahoo.com/v7/finance/options/${sym}`;
-  const json = await yfFetch(base, auth);
+  const json = await yfFetch(base, auth) as YFOptionsPayload;
   const result = json?.optionChain?.result?.[0];
   if (!result) return empty;
 

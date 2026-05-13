@@ -1,5 +1,8 @@
 import type { Quote, OHLCV, SearchResult } from '@/types/trading';
 
+interface PolygonAgg { o: number; h: number; l: number; c: number; v: number; vw?: number; t: number; }
+interface PolygonTicker { ticker: string; name: string; primary_exchange?: string; type?: string; }
+
 const BASE = 'https://api.polygon.io';
 
 async function get(path: string, revalidate = 60) {
@@ -27,7 +30,7 @@ export async function getQuote(ticker: string): Promise<Quote> {
     60,
   );
 
-  const results: any[] = aggs.results || [];
+  const results: PolygonAgg[] = aggs.results || [];
   if (results.length === 0) throw new Error(`No data for ${sym}`);
 
   const today = results[0];
@@ -57,7 +60,7 @@ export async function getHistory(ticker: string, days = 250): Promise<OHLCV[]> {
     `/v2/aggs/ticker/${sym}/range/1/day/${from}/${to}?adjusted=true&sort=asc&limit=300`,
     3600,
   );
-  return (data.results || []).map((r: any) => ({
+  return (data.results || []).map((r: PolygonAgg) => ({
     date: new Date(r.t).toISOString().split('T')[0],
     open: r.o,
     high: r.h,
@@ -67,7 +70,7 @@ export async function getHistory(ticker: string, days = 250): Promise<OHLCV[]> {
   }));
 }
 
-export async function getOptionsChain(ticker: string, dteMin = 14, dteMax = 60): Promise<any[]> {
+export async function getOptionsChain(ticker: string, dteMin = 14, dteMax = 60): Promise<unknown[]> {
   const sym = ticker.toUpperCase();
   const today = new Date();
   const minDate = new Date(today.getTime() + dteMin * 86400000).toISOString().split('T')[0];
@@ -89,7 +92,7 @@ export async function searchTickers(query: string): Promise<SearchResult[]> {
     `/v3/reference/tickers?search=${encodeURIComponent(query)}&active=true&market=stocks&limit=10`,
     86400,
   );
-  return (data.results || []).map((r: any) => ({
+  return (data.results || []).map((r: PolygonTicker) => ({
     ticker: r.ticker,
     name: r.name,
     market: r.primary_exchange || '',

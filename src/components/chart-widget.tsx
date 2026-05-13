@@ -2,16 +2,20 @@
 
 import { useEffect, useRef } from 'react';
 
+interface TradingViewWidget {
+  new (config: Record<string, unknown>): object;
+}
+
 declare global {
   interface Window {
-    TradingView: any;
+    TradingView: { widget: TradingViewWidget };
     tvScriptLoadingPromise?: Promise<void>;
   }
 }
 
 export function ChartWidget({ ticker }: { ticker: string }) {
   const containerId = `tv_${ticker}`;
-  const widgetRef = useRef<any>(null);
+  const widgetRef = useRef<object | null>(null);
 
   useEffect(() => {
     function createWidget() {
