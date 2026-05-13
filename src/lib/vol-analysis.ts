@@ -1,12 +1,14 @@
 import type { OHLCV } from '@/types/trading';
 
 export interface VolMetrics {
-  hv10: number;   // 10-day historical vol (annualised, %)
-  hv30: number;   // 30-day
-  hv60: number;   // 60-day
-  expectedDailyMove: number;   // $ next-day 1-sigma move
-  expectedDailyMovePct: number; // as % of price
-  ivProxy: number; // best HV window to use as IV proxy
+  hv10: number;
+  hv30: number;
+  hv60: number;
+  expectedDailyMove: number;
+  expectedDailyMovePct: number;
+  expectedSwingMove: number;    // 3-day 1-sigma expected move ($)
+  expectedSwingMovePct: number; // as % of price
+  ivProxy: number;
   ivProxyLabel: string;
 }
 
@@ -62,11 +64,14 @@ function bsPrice(S: number, K: number, T: number, sigma: number, isCall: boolean
     : K * disc * normalCDF(-d2) - S * normalCDF(-d1);
 }
 
-// Next trading day date (skip weekends)
-function nextTradingDay(from = new Date()): Date {
+// N-th trading day from `from` (skip weekends)
+function nthTradingDay(from: Date, n: number): Date {
   const d = new Date(from);
-  d.setDate(d.getDate() + 1);
-  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  let count = 0;
+  while (count < n) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) count++;
+  }
   return d;
 }
 
@@ -89,12 +94,13 @@ export function computeVolMetrics(bars: OHLCV[], currentPrice: number): VolMetri
   const hv30 = annualisedHV(closes, 30);
   const hv60 = annualisedHV(closes, 60);
 
-  // Use 10-day HV as IV proxy for next-day trades (short-term vol is most relevant)
-  const ivProxy = hv10 > 0 ? hv10 : hv30;
-  const ivProxyLabel = hv10 > 0 ? 'HV10' : 'HV30';
+  // Use HV30 as IV proxy for 3-day swing trades (medium-term vol is most relevant)
+  const ivProxy = hv30 > 0 ? hv30 : hv10;
+  const ivProxyLabel = hv30 > 0 ? 'HV30' : 'HV10';
 
   const dailySigma = ivProxy / 100 / Math.sqrt(252);
   const expectedDailyMove = currentPrice * dailySigma;
+  const expectedSwingMove = expectedDailyMove * Math.sqrt(3); // 3-day 1σ
 
   return {
     hv10: Math.round(hv10 * 10) / 10,
@@ -102,6 +108,8 @@ export function computeVolMetrics(bars: OHLCV[], currentPrice: number): VolMetri
     hv60: Math.round(hv60 * 10) / 10,
     expectedDailyMove: Math.round(expectedDailyMove * 100) / 100,
     expectedDailyMovePct: Math.round((dailySigma * 100) * 100) / 100,
+    expectedSwingMove: Math.round(expectedSwingMove * 100) / 100,
+    expectedSwingMovePct: Math.round((dailySigma * Math.sqrt(3) * 100) * 100) / 100,
     ivProxy: Math.round(ivProxy * 10) / 10,
     ivProxyLabel,
   };
@@ -115,11 +123,20 @@ export function generateSyntheticOptions(
   const sigma = vol.ivProxy / 100;
   const today = new Date();
 
-  // Two expiry targets: this Friday and next Friday
-  const expiries = [
+  // Expiry targets: 3 trading days out, this Friday, next Friday
+  const raw = [
+    { date: nthTradingDay(today, 3), label: '3 trading days' },
     { date: nextFriday(today, 0), label: 'this Friday' },
     { date: nextFriday(today, 1), label: 'next Friday' },
   ];
+  // Deduplicate by date string
+  const seen = new Set<string>();
+  const expiries = raw.filter((e) => {
+    const k = fmt(e.date);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 
   const options: SyntheticOption[] = [];
 
@@ -127,10 +144,8 @@ export function generateSyntheticOptions(
     const dte = Math.max(1, Math.ceil((exp.date.getTime() - today.getTime()) / 86400000));
     const T = dte / 365;
 
-    // Strike selection: slight OTM, biased by trend
-    // Calls: price + 0.3× daily move (slight OTM)
-    // Puts: price - 0.3× daily move
-    const nudge = vol.expectedDailyMove * 0.3;
+    // Strike nudged by a fraction of the 3-day expected move for swing plays
+    const nudge = vol.expectedSwingMove * 0.25;
 
     const candidates: { type: 'call' | 'put'; rawStrike: number }[] = [];
     if (trend !== 'bearish') candidates.push({ type: 'call', rawStrike: currentPrice + nudge });
@@ -149,8 +164,8 @@ export function generateSyntheticOptions(
       const breakevenPct = Math.round(((breakeven - currentPrice) / currentPrice) * 10000) / 100;
 
       const rationale = type === 'call'
-        ? `Slight OTM call targeting continued upside. Needs +${Math.abs(breakevenPct)}% move to break even at expiry; profitable if price moves above $${breakeven.toFixed(2)} by ${exp.label}.`
-        : `Slight OTM put targeting downside. Needs -${Math.abs(breakevenPct)}% move to break even at expiry; profitable if price falls below $${breakeven.toFixed(2)} by ${exp.label}.`;
+        ? `3-day swing call. Needs +${Math.abs(breakevenPct)}% by ${exp.label}. 3-day 1σ move: ±$${vol.expectedSwingMove} (${vol.expectedSwingMovePct}%). Profitable above $${breakeven.toFixed(2)}.`
+        : `3-day swing put. Needs -${Math.abs(breakevenPct)}% by ${exp.label}. 3-day 1σ move: ±$${vol.expectedSwingMove} (${vol.expectedSwingMovePct}%). Profitable below $${breakeven.toFixed(2)}.`;
 
       options.push({
         type,
