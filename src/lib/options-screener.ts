@@ -120,7 +120,7 @@ export function scoreOptions(
       daysToExpiry: dte,
       rawScore,
       breakevenPct,
-    } as any);
+    });
   }
 
   // Bias toward trend direction; fall back to mixed if not enough picks
@@ -129,7 +129,7 @@ export function scoreOptions(
   const pool = directional.length >= 2 ? directional : parsed;
 
   return pool
-    .sort((a, b) => (b as any).rawScore - (a as any).rawScore)
+    .sort((a, b) => b.rawScore - a.rawScore)
     .slice(0, 3)
-    .map(({ rawScore: _, ...c }) => c as ScoredOption);
+    .map(({ rawScore: _rawScore, ...c }) => c as ScoredOption);
 }

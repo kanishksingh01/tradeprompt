@@ -14,10 +14,9 @@ import { cn } from '@/lib/utils';
 import { formatDistanceToNow, parseISO, isBefore, addDays } from 'date-fns';
 
 export default function DashboardPage() {
-  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => getWatchlist());
 
   useEffect(() => {
-    setWatchlist(getWatchlist());
     function onUpdate() { setWatchlist(getWatchlist()); }
     window.addEventListener('watchlist-updated', onUpdate);
     return () => window.removeEventListener('watchlist-updated', onUpdate);
@@ -93,7 +92,7 @@ export default function DashboardPage() {
         {watchlist.length === 0 ? (
           <div className="text-center py-16 space-y-3">
             <p className="text-zinc-500">No tickers saved yet.</p>
-            <p className="text-zinc-600 text-sm">Search for a ticker and click "Add to Dashboard"</p>
+            <p className="text-zinc-600 text-sm">Search for a ticker and click &quot;Add to Dashboard&quot;</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -11,10 +11,9 @@ interface WatchlistButtonProps {
 }
 
 export function WatchlistButton({ item }: WatchlistButtonProps) {
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(() => isInWatchlist(item.ticker));
 
   useEffect(() => {
-    setSaved(isInWatchlist(item.ticker));
     function onUpdate() { setSaved(isInWatchlist(item.ticker)); }
     window.addEventListener('watchlist-updated', onUpdate);
     return () => window.removeEventListener('watchlist-updated', onUpdate);

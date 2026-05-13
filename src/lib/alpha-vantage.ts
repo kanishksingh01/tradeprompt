@@ -1,5 +1,14 @@
 import type { EarningsRecord } from '@/types/trading';
 
+interface AVQuarterlyEarning {
+  fiscalDateEnding: string;
+  reportedDate: string;
+  reportedEPS: string;
+  estimatedEPS: string;
+  surprise: string;
+  surprisePercentage: string;
+}
+
 const BASE = 'https://www.alphavantage.co/query';
 
 async function get(params: Record<string, string>) {
@@ -17,7 +26,7 @@ export async function getEarnings(ticker: string): Promise<{
 }> {
   try {
     const data = await get({ function: 'EARNINGS', symbol: ticker.toUpperCase() });
-    const quarterly: any[] = data.quarterlyEarnings || [];
+    const quarterly: AVQuarterlyEarning[] = data.quarterlyEarnings || [];
 
     const recent: EarningsRecord[] = quarterly.slice(0, 8).map((q) => ({
       fiscalDateEnding: q.fiscalDateEnding,
@@ -79,10 +88,16 @@ export async function getNewsSentiment(ticker: string): Promise<{
       sort: 'LATEST',
     });
 
-    const feed: any[] = data.feed || [];
+    interface AVFeedItem {
+      title: string; source: string; url: string; time_published: string;
+      overall_sentiment_score?: string;
+      overall_sentiment_label?: string;
+      ticker_sentiment?: Array<{ ticker: string; ticker_sentiment_score?: string; relevance_score?: string }>;
+    }
+    const feed: AVFeedItem[] = data.feed || [];
     const articles: NewsSentiment[] = feed.slice(0, 8).map((item) => {
       const tickerSentiment = (item.ticker_sentiment || []).find(
-        (t: any) => t.ticker === ticker.toUpperCase(),
+        (t) => t.ticker === ticker.toUpperCase(),
       );
       const score = parseFloat(tickerSentiment?.ticker_sentiment_score ?? item.overall_sentiment_score ?? '0');
       const relevance = parseFloat(tickerSentiment?.relevance_score ?? '0.5');
