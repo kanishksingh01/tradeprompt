@@ -24,10 +24,23 @@ function normalize(v: number, min: number, max: number): number {
   return max === min ? 0 : Math.max(0, Math.min(1, (v - min) / (max - min)));
 }
 
+// Reward strikes within 5% of a key support/resistance level
+function keyLevelProximity(strike: number, level: number): number {
+  if (level <= 0) return 0;
+  const dist = Math.abs(strike - level) / level;
+  return Math.max(0, 1 - dist / 0.05);
+}
+
+export interface ScreenerOptions {
+  support?: number;
+  resistance?: number;
+}
+
 export function scoreOptions(
   contracts: YFContract[],
   currentPrice: number,
   trend: 'bullish' | 'bearish' | 'neutral',
+  levels: ScreenerOptions = {},
 ): ScoredOption[] {
   const today = Date.now();
 
@@ -44,34 +57,43 @@ export function scoreOptions(
     const mid = bid > 0 && ask > 0 ? (bid + ask) / 2 : c.lastPrice ?? 0;
     const strike = c.strike;
 
-    // Next-day focus: tighter DTE window, near-ATM emphasis
-    if (dte < 1 || dte > 21) continue;
-    if (vol < 20) continue;
+    // 3-day swing window: 3–21 DTE, sweet spot 3–7
+    if (dte < 3 || dte > 21) continue;
+    if (vol < 10) continue;
     if (oi < 50) continue;
     if (mid <= 0) continue;
-    if (iv <= 0.05 || iv > 3.0) continue; // skip garbage IV
+    if (iv <= 0.05 || iv > 3.0) continue;
 
     const delta = blackScholesDelta(currentPrice, strike, T, iv, c.optionType === 'call');
     const absDelta = Math.abs(delta);
 
-    // For next-day plays we want near-ATM (delta 0.30–0.65) for gamma leverage
-    if (absDelta < 0.25 || absDelta > 0.70) continue;
+    // Swing delta range 0.25–0.75 (slightly wider than day-trade for directional plays)
+    if (absDelta < 0.25 || absDelta > 0.75) continue;
 
-    // Distance from ATM as fraction of price (lower = closer = better)
     const atmDistance = Math.abs(strike - currentPrice) / currentPrice;
 
-    const atmScore = 1 - normalize(atmDistance, 0, 0.06); // within 6% of price
+    // DTE score peaks at 3–7 days (3-day swing sweet spot)
+    const dteSwingScore = dte <= 7
+      ? 1 - normalize(dte, 3, 7) * 0.3    // 3 DTE = 1.0, 7 DTE = 0.7
+      : 1 - normalize(dte, 7, 21) * 0.7;  // 7 DTE = 0.7, 21 DTE = 0.0
+
+    const atmScore = 1 - normalize(atmDistance, 0, 0.06);
     const volOiScore = oi > 0 ? normalize(Math.min(vol / oi, 3), 0, 3) : 0;
-    const dteScore = 1 - normalize(dte, 1, 21);            // shorter DTE = more gamma
-    const liquidityScore = normalize(vol, 20, 3000);
-    const ivScore = 1 - normalize(iv, 0.15, 1.5);           // penalise very high IV (expensive premium)
+    const liquidityScore = normalize(vol, 10, 3000);
+    const ivScore = 1 - normalize(iv, 0.15, 1.5);
+
+    const isCall = c.optionType === 'call';
+    const levelScore = isCall
+      ? keyLevelProximity(strike, levels.support ?? 0)
+      : keyLevelProximity(strike, levels.resistance ?? 0);
 
     const rawScore =
-      atmScore * 0.35 +
-      volOiScore * 0.25 +
-      dteScore * 0.20 +
+      atmScore * 0.30 +
+      dteSwingScore * 0.25 +
+      volOiScore * 0.20 +
       liquidityScore * 0.12 +
-      ivScore * 0.08;
+      ivScore * 0.08 +
+      levelScore * 0.05;
 
     const breakeven = c.optionType === 'call'
       ? Math.round((strike + mid) * 100) / 100

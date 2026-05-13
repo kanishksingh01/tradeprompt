@@ -51,7 +51,10 @@ export default async function TickerPage({ params }: Props) {
     : { rsi: 50, macdLine: 0, macdSignal: 0, macdHist: 0, sma20: quote.price, sma50: quote.price, sma200: quote.price, trend: 'neutral' as const, support: quote.low, resistance: quote.high };
 
   const livePrice = yfData.currentPrice || quote.price;
-  const liveOptions = scoreOptions(yfData.contracts, livePrice, tech.trend);
+  const liveOptions = scoreOptions(yfData.contracts, livePrice, tech.trend, {
+    support: tech.support,
+    resistance: tech.resistance,
+  });
 
   // Fall back to vol-model picks when live options chain is unavailable
   const volMetrics = bars.length >= 20 ? computeVolMetrics(bars, livePrice) : null;
