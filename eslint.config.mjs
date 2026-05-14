@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Git worktrees created by tooling — not part of the build
+    ".claude/**",
   ]),
 ]);
 

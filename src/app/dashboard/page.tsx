@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { getWatchlist, removeFromWatchlist } from '@/lib/watchlist';
 import type { WatchlistItem } from '@/types/trading';
@@ -13,14 +13,13 @@ import { SearchBar } from '@/components/search-bar';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow, parseISO, isBefore, addDays } from 'date-fns';
 
-export default function DashboardPage() {
-  const [watchlist, setWatchlist] = useState<WatchlistItem[]>(() => getWatchlist());
+function subscribeWatchlist(cb: () => void) {
+  window.addEventListener('watchlist-updated', cb);
+  return () => window.removeEventListener('watchlist-updated', cb);
+}
 
-  useEffect(() => {
-    function onUpdate() { setWatchlist(getWatchlist()); }
-    window.addEventListener('watchlist-updated', onUpdate);
-    return () => window.removeEventListener('watchlist-updated', onUpdate);
-  }, []);
+export default function DashboardPage() {
+  const watchlist = useSyncExternalStore<WatchlistItem[]>(subscribeWatchlist, getWatchlist, () => []);
 
   const upcoming = watchlist
     .filter((w) => w.nextEarnings)

@@ -108,10 +108,18 @@ export interface Mover {
   volume: number;
 }
 
+interface PolygonSnapshotDay { c: number; v: number; }
+interface PolygonSnapshotTicker {
+  ticker: string;
+  day?: PolygonSnapshotDay;
+  todaysChangePerc?: number;
+  todaysChange?: number;
+}
+
 export async function getMovers(direction: 'gainers' | 'losers'): Promise<Mover[]> {
   try {
     const data = await get(`/v2/snapshot/locale/us/markets/stocks/${direction}`, 300);
-    return ((data.tickers as any[]) || []).slice(0, 12).map((t: any) => ({
+    return ((data.tickers as PolygonSnapshotTicker[]) || []).slice(0, 12).map((t) => ({
       ticker: t.ticker,
       price: Math.round((t.day?.c ?? 0) * 100) / 100,
       changePct: Math.round((t.todaysChangePerc ?? 0) * 100) / 100,
