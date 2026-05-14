@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart2, LayoutDashboard, TrendingUp } from 'lucide-react';
+import { BarChart2, LayoutDashboard, TrendingUp, ScanLine, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_LINKS = [
   { href: '/', icon: BarChart2, label: 'Analyze' },
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/screener', icon: ScanLine, label: 'Screener' },
+  { href: '/movers', icon: Flame, label: 'Movers' },
 ];
 
 export function Nav() {

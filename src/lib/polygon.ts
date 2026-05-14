@@ -99,3 +99,26 @@ export async function searchTickers(query: string): Promise<SearchResult[]> {
     type: r.type || 'CS',
   }));
 }
+
+export interface Mover {
+  ticker: string;
+  price: number;
+  changePct: number;
+  change: number;
+  volume: number;
+}
+
+export async function getMovers(direction: 'gainers' | 'losers'): Promise<Mover[]> {
+  try {
+    const data = await get(`/v2/snapshot/locale/us/markets/stocks/${direction}`, 300);
+    return ((data.tickers as any[]) || []).slice(0, 12).map((t: any) => ({
+      ticker: t.ticker,
+      price: Math.round((t.day?.c ?? 0) * 100) / 100,
+      changePct: Math.round((t.todaysChangePerc ?? 0) * 100) / 100,
+      change: Math.round((t.todaysChange ?? 0) * 100) / 100,
+      volume: t.day?.v ?? 0,
+    }));
+  } catch {
+    return [];
+  }
+}

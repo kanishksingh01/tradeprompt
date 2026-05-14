@@ -5,6 +5,8 @@ import { getEarnings, getCompanyOverview } from '@/lib/alpha-vantage';
 import { computeTechnicals } from '@/lib/technicals';
 import { scoreOptions } from '@/lib/options-screener';
 import { computeVolMetrics, generateSyntheticOptions } from '@/lib/vol-analysis';
+import { computePredictions } from '@/lib/price-prediction';
+import { PricePredictionCard } from '@/components/price-prediction-card';
 import { ChartWidget } from '@/components/chart-widget';
 import { OptionsCard } from '@/components/options-card';
 import { EarningsSection } from '@/components/earnings-section';
@@ -81,6 +83,10 @@ export default async function TickerPage({ params }: Props) {
           rationale: s.rationale,
         }))
       : [];
+  const predictions = bars.length >= 20
+    ? computePredictions(bars, livePrice, tech.rsi, tech.macdHist)
+    : null;
+
   const isUp = quote.changePct >= 0;
 
   const TrendIcon = tech.trend === 'bullish' ? TrendingUp : tech.trend === 'bearish' ? TrendingDown : Minus;
@@ -180,7 +186,12 @@ export default async function TickerPage({ params }: Props) {
         </div>
       </div>
 
-      <Separator className="bg-zinc-800" />
+      {predictions && (
+        <>
+          <PricePredictionCard prediction={predictions} currentPrice={livePrice} />
+          <Separator className="bg-zinc-800" />
+        </>
+      )}
 
       {/* AI Analysis */}
       <AnalysisStream ticker={ticker} />
